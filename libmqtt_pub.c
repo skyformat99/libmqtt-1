@@ -30,6 +30,7 @@
 
 #include <unistd.h>
 #include <errno.h>
+#include <sys/socket.h>
 
 struct ae_io {
     int fd;
@@ -513,6 +514,7 @@ __update(aeEventLoop *el, long long id, void *privdata) {
     io = (struct ae_io *)privdata;
     if (LIBMQTT_SUCCESS != (rc = libmqtt__update(io->mqtt))) {
         fprintf(stderr, "libmqtt__update: %s\n", libmqtt__strerror(rc));
+        shutdown(io->fd, SHUT_WR);
         return AE_NOMORE;
     }
     return 1000;
