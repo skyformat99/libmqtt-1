@@ -796,7 +796,6 @@ mqtt__parse(struct mqtt_parser *p, struct mqtt_b *b, struct mqtt_packet *pkt) {
     char *c, *e;
     int offset;
 
-    memset(pkt, 0, sizeof *pkt);
     e = b->s + b->n;
     c = b->s;
     while (c < e) {
