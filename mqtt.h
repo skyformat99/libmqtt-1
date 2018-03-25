@@ -256,6 +256,7 @@ struct mqtt_parser {
     int require;
     int multiplier;
     struct mqtt_b remaining;
+    struct mqtt_packet pkt;
 };
 
 
@@ -716,7 +717,7 @@ __process(struct mqtt_parser *p, struct mqtt_packet *pkt) {
     enum mqtt_p_type type;
     struct mqtt_b b;
 
-    type = pkt->h.type;
+    type = p->pkt.h.type;
     if (p->auth == 0 && (type != CONNECT && type != CONNACK)) {
         return -1;
     }
@@ -724,60 +725,60 @@ __process(struct mqtt_parser *p, struct mqtt_packet *pkt) {
     b.n = p->remaining.n;
     switch (type) {
     case CONNECT:
-        rc = __parse_connect(pkt, &b);
-        if (!rc) rc = __process_connect(pkt);
+        rc = __parse_connect(&p->pkt, &b);
+        if (!rc) rc = __process_connect(&p->pkt);
         break;
     case CONNACK:
-        rc = __parse_connack(pkt, &b);
-        if (!rc) rc = __process_connack(pkt);
+        rc = __parse_connack(&p->pkt, &b);
+        if (!rc) rc = __process_connack(&p->pkt);
         break;
     case PUBLISH:
-        rc = __parse_publish(pkt, &b);
-        if (!rc) rc = __process_publish(pkt);
+        rc = __parse_publish(&p->pkt, &b);
+        if (!rc) rc = __process_publish(&p->pkt);
         break;
     case PUBACK:
-        rc = __parse_puback(pkt, &b);
-        if (!rc) rc = __process_puback(pkt);
+        rc = __parse_puback(&p->pkt, &b);
+        if (!rc) rc = __process_puback(&p->pkt);
         break;
     case PUBREC:
-        rc = __parse_pubrec(pkt, &b);
-        if (!rc) rc = __process_pubrec(pkt);
+        rc = __parse_pubrec(&p->pkt, &b);
+        if (!rc) rc = __process_pubrec(&p->pkt);
         break;
     case PUBREL:
-        rc = __parse_pubrel(pkt, &b);
-        if (!rc) rc = __process_pubrel(pkt);
+        rc = __parse_pubrel(&p->pkt, &b);
+        if (!rc) rc = __process_pubrel(&p->pkt);
         break;
     case PUBCOMP:
-        rc = __parse_pubcomp(pkt, &b);
-        if (!rc) rc = __process_pubcomp(pkt);
+        rc = __parse_pubcomp(&p->pkt, &b);
+        if (!rc) rc = __process_pubcomp(&p->pkt);
         break;
     case SUBSCRIBE:
-        rc = __parse_subscribe(pkt, &b);
-        if (!rc) rc = __process_subscribe(pkt);
+        rc = __parse_subscribe(&p->pkt, &b);
+        if (!rc) rc = __process_subscribe(&p->pkt);
         break;
     case SUBACK:
-        rc = __parse_suback(pkt, &b);
-        if (!rc) rc = __process_suback(pkt);
+        rc = __parse_suback(&p->pkt, &b);
+        if (!rc) rc = __process_suback(&p->pkt);
         break;
     case UNSUBSCRIBE:
-        rc = __parse_unsubscribe(pkt, &b);
-        if (!rc) rc = __process_unsubscribe(pkt);
+        rc = __parse_unsubscribe(&p->pkt, &b);
+        if (!rc) rc = __process_unsubscribe(&p->pkt);
         break;
     case UNSUBACK:
-        rc = __parse_unsuback(pkt, &b);
-        if (!rc) rc = __process_unsuback(pkt);
+        rc = __parse_unsuback(&p->pkt, &b);
+        if (!rc) rc = __process_unsuback(&p->pkt);
         break;
     case PINGREQ:
-        rc = __parse_pingreq(pkt, &b);
-        if (!rc) rc = __process_pingreq(pkt);
+        rc = __parse_pingreq(&p->pkt, &b);
+        if (!rc) rc = __process_pingreq(&p->pkt);
         break;
     case PINGRESP:
-        rc = __parse_pingresp(pkt, &b);
-        if (!rc) rc = __process_pingresp(pkt);
+        rc = __parse_pingresp(&p->pkt, &b);
+        if (!rc) rc = __process_pingresp(&p->pkt);
         break;
     case DISCONNECT:
-        rc = __parse_disconnect(pkt, &b);
-        if (!rc) rc = __process_disconnect(pkt);
+        rc = __parse_disconnect(&p->pkt, &b);
+        if (!rc) rc = __process_disconnect(&p->pkt);
         break;
     default:
         rc = -1;
@@ -788,6 +789,7 @@ __process(struct mqtt_parser *p, struct mqtt_packet *pkt) {
     if (type == CONNECT || type == CONNACK) {
         p->auth = 1;
     }
+    memcpy(pkt, &p->pkt, sizeof *pkt);
     return 1;
 }
 
@@ -801,10 +803,11 @@ mqtt__parse(struct mqtt_parser *p, struct mqtt_b *b, struct mqtt_packet *pkt) {
     while (c < e) {
         switch (p->state) {
         case MQTT_ST_FIXED:
-            pkt->h.type = (((*c) >> 4) & 0x0F);
-            pkt->h.dup = (((*c) >> 3) & 0x01);
-            pkt->h.qos = (((*c) >> 1) & 0x03);
-            pkt->h.retain = (((*c) >> 0) & 0x01);
+            memset(&p->pkt, 0, sizeof p->pkt);
+            p->pkt.h.type = (((*c) >> 4) & 0x0F);
+            p->pkt.h.dup = (((*c) >> 3) & 0x01);
+            p->pkt.h.qos = (((*c) >> 1) & 0x03);
+            p->pkt.h.retain = (((*c) >> 0) & 0x01);
             p->state = MQTT_ST_LENGTH;
             p->multiplier = 1;
             mqtt_b_free(&p->remaining);
