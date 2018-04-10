@@ -154,7 +154,7 @@ struct mqtt_p_connect {
     int will_retain;
     enum mqtt_qos will_qos;
     int will_flag;
-    int clean_sess;
+    int clean_session;
     uint16_t keep_alive;
     struct mqtt_b will_topic;
     struct mqtt_b will_payload;
@@ -391,7 +391,7 @@ __process_connect(struct mqtt_packet *p) {
     struct mqtt_p_connect *c;
 
     c = &p->v.connect;
-    if (0 == c->clean_sess && mqtt_b_empty(&c->client_id))
+    if (0 == c->clean_session && mqtt_b_empty(&c->client_id))
         return -1;
     if (c->will_flag) {
         if (mqtt_b_empty(&c->will_topic) || mqtt_b_empty(&c->will_payload))
@@ -534,7 +534,7 @@ __parse_connect(struct mqtt_packet *pkt, struct mqtt_b *remaining) {
     if (remaining->n < 1) return -1;
 
     flags = mqtt_b_read_u8(remaining);
-    pkt->v.connect.clean_sess = ((flags >> 1) & 0x01);
+    pkt->v.connect.clean_session = ((flags >> 1) & 0x01);
     pkt->v.connect.will_flag = ((flags >> 2) & 0x01);
     pkt->v.connect.will_qos = ((flags >> 3) & 0x03);
     pkt->v.connect.will_retain = ((flags >> 5) & 0x01);
@@ -903,7 +903,7 @@ __serialize_connect(struct mqtt_packet *pkt, struct mqtt_b *b) {
             flags |= (1 << 5);
         flags |= ((pkt->v.connect.will_qos & 0x03) << 3);
     }
-    if (pkt->v.connect.clean_sess)
+    if (pkt->v.connect.clean_session)
         flags |= (1 << 1);
     l_len = __pack_remain_length(r_l, l);
     b->n = l_len + r_l + 1;

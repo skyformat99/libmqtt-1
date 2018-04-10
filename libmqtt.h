@@ -101,7 +101,7 @@ extern LIBMQTT_API void libmqtt__destroy(struct libmqtt *mqtt);
 
 extern LIBMQTT_API void libmqtt__time_retry(struct libmqtt *mqtt, int time_retry);
 extern LIBMQTT_API void libmqtt__keep_alive(struct libmqtt *mqtt, uint16_t keep_alive);
-extern LIBMQTT_API void libmqtt__clean_sess(struct libmqtt *mqtt, int clean_sess);
+extern LIBMQTT_API void libmqtt__clean_session(struct libmqtt *mqtt, int clean_session);
 extern LIBMQTT_API void libmqtt__version(struct libmqtt *mqtt, enum mqtt_vsn vsn);
 extern LIBMQTT_API void libmqtt__auth(struct libmqtt *mqtt, const char *username, const char *password);
 extern LIBMQTT_API void libmqtt__will(struct libmqtt *mqtt, int retain, enum mqtt_qos qos, const char *topic, const char *payload, int payload_len);
@@ -643,7 +643,7 @@ libmqtt__create(struct libmqtt **mqtt, const char *client_id, void *ud, struct l
     m->t.send = 0;
     m->time_retry = LIBMQTT_DEF_TIMERETRY;
     m->c.keep_alive = LIBMQTT_DEF_KEEPALIVE;
-    m->c.clean_sess = 1;
+    m->c.clean_session = 1;
     m->c.proto_ver = MQTT_PROTO_V4;
     m->log = __libmqtt_default_log;
     m->log_level = LIBMQTT_LOG_WARN;
@@ -680,10 +680,10 @@ libmqtt__keep_alive(struct libmqtt *mqtt, uint16_t keep_alive) {
 }
 
 void
-libmqtt__clean_sess(struct libmqtt *mqtt, int clean_sess) {
+libmqtt__clean_session(struct libmqtt *mqtt, int clean_session) {
     if (!mqtt) return;
 
-    mqtt->c.clean_sess = clean_sess;
+    mqtt->c.clean_session = clean_session;
 }
 
 void
@@ -752,7 +752,7 @@ libmqtt__connect(struct libmqtt *mqtt, void *io, libmqtt__io_write write) {
     if (rc) return LIBMQTT_ERROR_WRITE;
 
     __LIBMQTT_INFO("sending CONNECT (%s, c%d, k%d, u\'%.*s\', p\'%.*s\')", MQTT_PROTOCOL_NAMES[mqtt->c.proto_ver],
-          mqtt->c.clean_sess, mqtt->c.keep_alive, mqtt->c.username.n, mqtt->c.username.s,
+          mqtt->c.clean_session, mqtt->c.keep_alive, mqtt->c.username.n, mqtt->c.username.s,
           mqtt->c.password.n, mqtt->c.password.s);
     return LIBMQTT_SUCCESS;
 }

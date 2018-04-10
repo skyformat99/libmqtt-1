@@ -514,7 +514,7 @@ main(int argc, char *argv[]) {
     rc = libmqtt__create(&mqtt, client_id, 0, &cb);
     if (!rc && debug == 1) libmqtt__set_log_level(mqtt, LIBMQTT_LOG_DEBUG);
     if (!rc) libmqtt__version(mqtt, proto_ver);
-    if (!rc) libmqtt__clean_sess(mqtt, clean_session);
+    if (!rc) libmqtt__clean_session(mqtt, clean_session);
     if (!rc) libmqtt__keep_alive(mqtt, keepalive);
     if (will_topic) {
         if (!rc) libmqtt__will(mqtt, will_retain, will_qos, will_topic, will_payload, will_length);
