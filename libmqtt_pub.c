@@ -416,7 +416,7 @@ load_file(void) {
 static void
 do_publish(struct libmqtt *mqtt) {
     int rc;
-    rc = libmqtt__publish(mqtt, 0, topic, qos, retain, payload, length);
+    rc = libmqtt__publish(mqtt, 0, retain, qos, topic, payload, length);
     if (rc != LIBMQTT_SUCCESS) {
         if (!quiet) fprintf(stderr, "%s\n", libmqtt__strerror(rc));
         libmqtt__disconnect(mqtt);

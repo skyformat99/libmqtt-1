@@ -111,7 +111,7 @@ extern LIBMQTT_API int libmqtt__disconnect(struct libmqtt *mqtt);
 
 extern LIBMQTT_API int libmqtt__subscribe(struct libmqtt *mqtt, uint16_t *id, int count, const char *topic[], enum mqtt_qos qos[]);
 extern LIBMQTT_API int libmqtt__unsubscribe(struct libmqtt *mqtt, uint16_t *id, int count, const char *topic[]);
-extern LIBMQTT_API int libmqtt__publish(struct libmqtt *mqtt, uint16_t *id, const char *topic, enum mqtt_qos qos, int retain, const char *payload, int length);
+extern LIBMQTT_API int libmqtt__publish(struct libmqtt *mqtt, uint16_t *id, int retain, enum mqtt_qos qos, const char *topic, const char *payload, int length);
 
 extern LIBMQTT_API int libmqtt__read(struct libmqtt *mqtt, const char *data, int size);
 extern LIBMQTT_API int libmqtt__update(struct libmqtt *mqtt);
@@ -206,6 +206,7 @@ struct libmqtt {
 
 static int
 __libmqtt_write(struct libmqtt *mqtt, const char *data, int size) {
+    if (!mqtt->io_write) return -1;
     if (-1 == mqtt->io_write(mqtt->io, data, size)) {
         return -1;
     }
@@ -692,7 +693,7 @@ libmqtt__version(struct libmqtt *mqtt, enum mqtt_vsn vsn) {
 
     if (MQTT_IS_VER(vsn)) {
         mqtt->c.proto_ver = vsn;
-    }    
+    }
 }
 
 void
@@ -711,7 +712,7 @@ libmqtt__auth(struct libmqtt *mqtt, const char *username, const char *password) 
 
 void
 libmqtt__will(struct libmqtt *mqtt, int retain, enum mqtt_qos qos, const char *topic,
-                  const char *payload, int payload_len) {
+              const char *payload, int payload_len) {
     if (!topic) {
         mqtt->c.will_flag = 0;
         return;
@@ -786,7 +787,7 @@ libmqtt__subscribe(struct libmqtt *mqtt, uint16_t *id, int count, const char *to
 
     for (i = 0; i < count; i++) {
         __LIBMQTT_INFO("Sending SUBSCRIBE (id: %"PRIu16", topic: %s, qos: %d)",
-              p.v.subscribe.packet_id, topic[i], qos[i]);
+                       p.v.subscribe.packet_id, topic[i], qos[i]);
     }
     return LIBMQTT_SUCCESS;
 }
@@ -826,8 +827,8 @@ libmqtt__unsubscribe(struct libmqtt *mqtt, uint16_t *id, int count, const char *
 }
 
 int
-libmqtt__publish(struct libmqtt *mqtt, uint16_t *id, const char *topic,
-                     enum mqtt_qos qos, int retain, const char *payload, int length) {
+libmqtt__publish(struct libmqtt *mqtt, uint16_t *id, int retain, enum mqtt_qos qos,
+                 const char *topic, const char *payload, int length) {
     struct mqtt_packet p;
     struct mqtt_b b;
     enum libmqtt_state s;
@@ -955,7 +956,7 @@ libmqtt__read(struct libmqtt *mqtt, const char *data, int size) {
 int
 libmqtt__update(struct libmqtt *mqtt) {
     if (!mqtt) return LIBMQTT_ERROR_NULL;
-    
+
     mqtt->t.now += 1;
 
     if (mqtt->c.keep_alive > 0) {

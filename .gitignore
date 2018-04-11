@@ -65,6 +65,7 @@ install-sh
 libmqtt.pc
 libmqtt_pub
 libmqtt_sub
+libmqtt_cmd
 libtool
 ltmain.sh
 Makefile
