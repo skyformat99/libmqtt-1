@@ -413,7 +413,7 @@ __write(void *p, const char *data, int size) {
     struct ae_io *io;
 
     io = (struct ae_io *)p;
-    return write(io->fd, data, size);
+    return write(io->fd, data, size) > 0 ? 0 : -1;
 }
 
 static int

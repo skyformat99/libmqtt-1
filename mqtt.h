@@ -1104,7 +1104,7 @@ __serialize_pingresp(struct mqtt_packet *pkt, struct mqtt_b *b) {
 static void
 __serialize_disconnect(struct mqtt_packet *pkt, struct mqtt_b *b) {
     (void)pkt;
-    
+
     b->s = malloc(2);
     b->n = 0;
     mqtt_b_write_u8(b, 0xe0);

@@ -206,12 +206,14 @@ struct libmqtt {
 
 static int
 __libmqtt_write(struct libmqtt *mqtt, const char *data, int size) {
+    int rc;
+
     if (!mqtt->io_write) return -1;
-    if (-1 == mqtt->io_write(mqtt->io, data, size)) {
-        return -1;
+    rc = mqtt->io_write(mqtt->io, data, size);
+    if (!rc) {
+        mqtt->t.send = mqtt->t.now;
     }
-    mqtt->t.send = mqtt->t.now;
-    return 0;
+    return rc;
 }
 
 static void
@@ -273,7 +275,7 @@ __libmqtt_check_retry(struct libmqtt *mqtt) {
                     mqtt__serialize(&p, &b);
                     if (0 == __libmqtt_write(mqtt, b.s, b.n)) {
                         __LIBMQTT_INFO("sending PUBLISH (d%d, q%d, r%d, m%"PRIu16", \'%s\', ...(%d bytes))",
-                              1, pub->p.qos, pub->p.retain, pub->p.packet_id, pub->p.topic, pub->p.length);
+                                       1, pub->p.qos, pub->p.retain, pub->p.packet_id, pub->p.topic, pub->p.length);
                         if (pub->p.qos == MQTT_QOS_0) {
                             *pp = (*pp)->next;
                             free(pub->p.topic);
@@ -398,7 +400,7 @@ libmqtt__strerror(int rc) {
 
 static void
 __libmqtt_insert_pub(struct libmqtt *mqtt, struct mqtt_packet *p, enum libmqtt_dir d,
-             enum libmqtt_state s) {
+                     enum libmqtt_state s) {
     struct libmqtt_pub *pub;
 
     pub = (struct libmqtt_pub *)malloc(sizeof *pub);
@@ -450,7 +452,7 @@ __libmqtt_update_pub(struct libmqtt *mqtt, struct libmqtt_pub *pub, enum libmqtt
 
 static struct libmqtt_pub *
 __libmqtt_find_pub(struct libmqtt *mqtt, uint16_t packet_id, enum libmqtt_dir d,
-           enum libmqtt_state s) {
+                   enum libmqtt_state s) {
     struct libmqtt_pub *pub;
 
     pub = mqtt->pub.head;
@@ -501,31 +503,31 @@ __libmqtt_on_publish(struct libmqtt *mqtt, struct mqtt_packet *p) {
     strncpy(topic, p->v.publish.topic.s, p->v.publish.topic.n);
     topic[p->v.publish.topic.n] = '\0';
     __LIBMQTT_INFO("received PUBLISH (d%d, q%d, r%d, m%"PRIu16", \'%s\', ...(%d bytes))",
-          p->h.dup, p->h.qos, p->h.retain, p->v.publish.packet_id, topic, p->payload.n);
+                   p->h.dup, p->h.qos, p->h.retain, p->v.publish.packet_id, topic, p->payload.n);
     switch (p->h.qos) {
-        case MQTT_QOS_0:
-            if (mqtt->cb.publish)
-                mqtt->cb.publish(mqtt, mqtt->ud, p->v.publish.packet_id, topic, p->h.qos, p->h.retain, p->payload.s, p->payload.n);
+    case MQTT_QOS_0:
+        if (mqtt->cb.publish)
+            mqtt->cb.publish(mqtt, mqtt->ud, p->v.publish.packet_id, topic, p->h.qos, p->h.retain, p->payload.s, p->payload.n);
+        return 0;
+    case MQTT_QOS_1:
+        if (mqtt->cb.publish)
+            mqtt->cb.publish(mqtt, mqtt->ud, p->v.publish.packet_id, topic, p->h.qos, p->h.retain, p->payload.s, p->payload.n);
+        if (__libmqtt_write(mqtt, puback, sizeof puback)) {
+            __libmqtt_insert_pub(mqtt, p, LIBMQTT_DIR_IN, LIBMQTT_ST_SEND_PUBACK);
             return 0;
-        case MQTT_QOS_1:
-            if (mqtt->cb.publish)
-                mqtt->cb.publish(mqtt, mqtt->ud, p->v.publish.packet_id, topic, p->h.qos, p->h.retain, p->payload.s, p->payload.n);
-            if (__libmqtt_write(mqtt, puback, sizeof puback)) {
-                __libmqtt_insert_pub(mqtt, p, LIBMQTT_DIR_IN, LIBMQTT_ST_SEND_PUBACK);
-                return 0;
-            }
-            __LIBMQTT_INFO("sending PUBACK (id: %"PRIu16")", p->v.publish.packet_id);
+        }
+        __LIBMQTT_INFO("sending PUBACK (id: %"PRIu16")", p->v.publish.packet_id);
+        return 0;
+    case MQTT_QOS_2:
+        if (__libmqtt_write(mqtt, pubrec, sizeof pubrec)) {
+            __libmqtt_insert_pub(mqtt, p, LIBMQTT_DIR_IN, LIBMQTT_ST_SEND_PUBREC);
             return 0;
-        case MQTT_QOS_2:
-            if (__libmqtt_write(mqtt, pubrec, sizeof pubrec)) {
-                __libmqtt_insert_pub(mqtt, p, LIBMQTT_DIR_IN, LIBMQTT_ST_SEND_PUBREC);
-                return 0;
-            }
-            __LIBMQTT_INFO("sending PUBREC (id: %"PRIu16")", p->v.publish.packet_id);
-            __libmqtt_insert_pub(mqtt, p, LIBMQTT_DIR_IN, LIBMQTT_ST_WAIT_PUBREL);
-            return 0;
-        case MQTT_QOS_F:
-            return -1;
+        }
+        __LIBMQTT_INFO("sending PUBREC (id: %"PRIu16")", p->v.publish.packet_id);
+        __libmqtt_insert_pub(mqtt, p, LIBMQTT_DIR_IN, LIBMQTT_ST_WAIT_PUBREL);
+        return 0;
+    case MQTT_QOS_F:
+        return -1;
     }
     return 0;
 }
@@ -753,8 +755,8 @@ libmqtt__connect(struct libmqtt *mqtt, void *io, libmqtt__io_write write) {
     if (rc) return LIBMQTT_ERROR_WRITE;
 
     __LIBMQTT_INFO("sending CONNECT (%s, c%d, k%d, u\'%.*s\', p\'%.*s\')", MQTT_PROTOCOL_NAMES[mqtt->c.proto_ver],
-          mqtt->c.clean_session, mqtt->c.keep_alive, mqtt->c.username.n, mqtt->c.username.s,
-          mqtt->c.password.n, mqtt->c.password.s);
+                   mqtt->c.clean_session, mqtt->c.keep_alive, mqtt->c.username.n, mqtt->c.username.s,
+                   mqtt->c.password.n, mqtt->c.password.s);
     return LIBMQTT_SUCCESS;
 }
 
@@ -821,7 +823,7 @@ libmqtt__unsubscribe(struct libmqtt *mqtt, uint16_t *id, int count, const char *
     }
     for (i = 0; i < count; i++) {
         __LIBMQTT_INFO("Sending UNSUBSCRIBE (id: %"PRIu16", topic: %s)",
-              p.v.unsubscribe.packet_id, topic[i]);
+                       p.v.unsubscribe.packet_id, topic[i]);
     }
     return LIBMQTT_SUCCESS;
 }
@@ -858,7 +860,7 @@ libmqtt__publish(struct libmqtt *mqtt, uint16_t *id, int retain, enum mqtt_qos q
     mqtt_b_free(&b);
     if (!rc) {
         __LIBMQTT_INFO("sending PUBLISH (d%d, q%d, r%d, m%"PRIu16", \'%s\', ...(%d bytes))",
-              0, qos, retain, p.v.publish.packet_id, topic, length);
+                       0, qos, retain, p.v.publish.packet_id, topic, length);
     }
     if (!rc && qos == MQTT_QOS_0) {
         if (mqtt->cb.puback)
